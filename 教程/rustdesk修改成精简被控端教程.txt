@@ -1,0 +1,322 @@
+
+修改一、
+@override
+Widget build(BuildContext context) {
+  super.build(context);
+  final isIncomingOnly = bind.isIncomingOnly();
+  return _buildBlock(
+      child: Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      buildLeftPane(context),
+      if (!isIncomingOnly) const VerticalDivider(width: 1),
+      if (!isIncomingOnly) Expanded(child: buildRightPane(context)),
+    ],
+  ));
+}
+
+这里改成下面
+修改一、
+@override
+Widget build(BuildContext context) {
+  super.build(context);
+  return Container(
+    width: 280,
+    height: 220,
+    child: Column(
+      children: [
+        buildIDBoard(context),
+        SizedBox(height: 10),
+        buildPasswordBoard(context),
+        Spacer(),
+        OnlineStatusWidget(
+          onSvcStatusChanged: () {
+            // 保留状态变化回调
+          },
+        ).marginOnly(bottom: 6, right: 6),
+      ],
+    ),
+  );
+}
+
+修改二、
+还有这里也要改
+Widget buildLeftPane(BuildContext context) {
+  final isIncomingOnly = bind.isIncomingOnly();
+  final isOutgoingOnly = bind.isOutgoingOnly();
+  final children = <Widget>[
+    if (!isOutgoingOnly) buildPresetPasswordWarning(),
+    if (bind.isCustomClient())
+      Align(
+        alignment: Alignment.center,
+        child: loadPowered(context),
+      ),
+    Align(
+      alignment: Alignment.center,
+      child: loadLogo(),
+    ),
+    buildTip(context),
+    if (!isOutgoingOnly) buildIDBoard(context),
+    if (!isOutgoingOnly) buildPasswordBoard(context),
+    FutureBuilder<Widget>(
+      future: Future.value(
+          Obx(() => buildHelpCards(stateGlobal.updateUrl.value))),
+      builder: (_, data) {
+        if (data.hasData) {
+          if (isIncomingOnly) {
+            if (isInHomePage()) {
+              Future.delayed(Duration(milliseconds: 300), () {
+                _updateWindowSize();
+              });
+            }
+          }
+          return data.data!;
+        } else {
+          return const Offstage();
+        }
+      },
+    ),
+    buildPluginEntry(),
+  ];
+  if (isIncomingOnly) {
+    children.addAll([
+      Divider(),
+      OnlineStatusWidget(
+        onSvcStatusChanged: () {
+          if (isInHomePage()) {
+            Future.delayed(Duration(milliseconds: 300), () {
+              _updateWindowSize();
+            });
+          }
+        },
+      ).marginOnly(bottom: 6, right: 6)
+    ]);
+  }
+  final textColor = Theme.of(context).textTheme.titleLarge?.color;
+  return ChangeNotifierProvider.value(
+    value: gFFI.serverModel,
+    child: Container(
+      width: isIncomingOnly ? 280.0 : 200.0,
+      color: Theme.of(context).colorScheme.background,
+      child: Stack(
+        children: [
+          Column(
+            children: [
+              SingleChildScrollView(
+                controller: _leftPaneScrollController,
+                child: Column(
+                  key: _childKey,
+                  children: children,
+                ),
+              ),
+              Expanded(child: Container())
+            ],
+          ),
+          if (isOutgoingOnly)
+            Positioned(
+              bottom: 6,
+              left: 12,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: InkWell(
+                  child: Obx(
+                    () => Icon(
+                      Icons.settings,
+                      color: _editHover.value
+                          ? textColor
+                          : Colors.grey.withOpacity(0.5),
+                      size: 22,
+                    ),
+                  ),
+                  onTap: () => {
+                    if (DesktopSettingPage.tabKeys.isNotEmpty)
+                      {
+                        DesktopSettingPage.switch2page(
+                            DesktopSettingPage.tabKeys[0])
+                      }
+                  },
+                  onHover: (value) => _editHover.value = value,
+                ),
+              )
+            )
+        ],
+      ),
+    ),
+  );
+}
+
+
+改成
+修改二、
+Widget buildLeftPane(BuildContext context) {
+  return Column(
+    children: [
+      buildIDBoard(context),
+      SizedBox(height: 10),
+      buildPasswordBoard(context),
+      Spacer(),
+      OnlineStatusWidget(
+        onSvcStatusChanged: () {
+          // 保留状态变化回调
+        },
+      ).marginOnly(bottom: 6, right: 6),
+    ],
+  );
+}
+
+修改三、
+最后，在 WidgetsBinding.instance.addObserver(this); 之前添加窗口大小设置：// 设置窗口大小
+
+WidgetsBinding.instance.addPostFrameCallback((_) {
+  windowManager.setSize(Size(300, 220));
+});
+
+if (bind.isIncomingOnly()) {
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    _updateWindowSize();
+  });
+}
+WidgetsBinding.instance.addObserver(this);
+
+
+修改四、源码
+去掉设置按钮
+Widget buildPopupMenu(BuildContext context) {
+  final textColor = Theme.of(context).textTheme.titleLarge?.color;
+  RxBool hover = false.obs;
+  return InkWell(
+    onTap: DesktopTabPage.onAddSetting,
+    child: Tooltip(
+      message: translate('Settings'),
+      child: Obx(
+        () => CircleAvatar(
+          radius: 15,
+          backgroundColor: hover.value
+              ? Theme.of(context).scaffoldBackgroundColor
+              : Theme.of(context).colorScheme.background,
+          child: Icon(
+            Icons.more_vert_outlined,
+            size: 20,
+            color: hover.value ? textColor : textColor?.withOpacity(0.5),
+          ),
+        ),
+      ),
+    ),
+    onHover: (value) => hover.value = value,
+  );
+}
+
+修改四、改后
+
+Widget buildPopupMenu(BuildContext context) {
+  return Container(); 
+}
+
+
+desktop_tab_page.dart页面 更改
+tail: Offstage(
+  // 原来的条件：bind.isIncomingOnly() || bind.isDisableSettings()
+  // 修改为始终为 true，强制隐藏按钮
+  offstage: true, 
+  child: ActionIcon(
+    message: 'Settings',
+    icon: IconFont.menu,
+    onTap: DesktopTabPage.onAddSetting,
+    isClose: false,
+  ),
+)
+
+homepage重要修改
+
+buildIDBoard(BuildContext context) {
+  final model = gFFI.serverModel;
+  return Container(
+    margin: const EdgeInsets.only(left: 20, right: 11),
+    // 1. 大幅增加容器高度，从80改成100，给所有内容足够空间
+    height: 100,
+    child: Row(
+      // 2. 把对齐方式从baseline改成start，避免文字整体上移
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 2,
+          // 3. 让左侧彩色竖线高度适配容器，避免过短
+          height: double.infinity,
+          decoration: const BoxDecoration(color: MyTheme.accent),
+        ).marginOnly(top: 5),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(left: 7, top: 5), // 4. 顶部加5px内边距，下拉文字
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 新增第一行文字：QucikCtrlr远程
+                Text(
+                  "QucikCtrlr远程",
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Theme.of(context).textTheme.titleLarge?.color,
+                  ),
+                ),
+                // 新增第二行文字：请把下方的ID发给客服即可
+                Text(
+                  "请把下方的ID发给客服即可",
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).textTheme.titleLarge?.color?.withOpacity(0.7),
+                  ),
+                ).marginOnly(
+                  bottom: 8, // 5. 增加底部间距到8px，拉开与下方ID标题的距离
+                  top: 2,    // 6. 与第一行文字加2px间距，避免拥挤
+                ),
+                // 原有ID标题部分
+                Container(
+                  height: 25,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        translate("ID"),
+                        style: TextStyle(
+                            fontSize: 14,
+                            color: Theme.of(context)
+                                .textTheme
+                                .titleLarge
+                                ?.color
+                                ?.withOpacity(0.5)),
+                      ).marginOnly(top: 5),
+                      buildPopupMenu(context)
+                    ],
+                  ),
+                ),
+                // 原有ID输入框部分
+                Flexible(
+                  child: GestureDetector(
+                    onDoubleTap: () {
+                      Clipboard.setData(ClipboardData(text: model.serverId.text));
+                      showToast(translate("Copied"));
+                    },
+                    child: TextFormField(
+                      controller: model.serverId,
+                      readOnly: true,
+                      decoration: InputDecoration(
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.only(top: 10, bottom: 10),
+                      ),
+                      style: TextStyle(fontSize: 22),
+                    ).workaroundFreezeLinuxMint(),
+                  ),
+                )
+              ],
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+
+
+
